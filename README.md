@@ -1,4 +1,4 @@
-# Kansai Dialect Accent Dictionary
+# Kansai Accent Dictionary 
 
 A simple online dictionary for viewing pitch-accent of words in the regional Japanese Kansai dialect.
 
