@@ -3,7 +3,7 @@
 A simple online dictionary for viewing pitch-accent of words in the regional Japanese Kansai dialect.
 
 
-関西弁の高低アクセントのオンライン辞書。
+関西弁の高低アクセント辞典です。
 
 
 [![Visit Kansai Accent Dictionary site](https://img.shields.io/badge/%20Visit%20Site-▸-6366f1?style=for-the-badge)](https://kansai.milkyskies.dev/) 
