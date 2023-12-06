@@ -1,21 +1,12 @@
-import type { LayoutLoad } from "./$types";
-import { supabase } from "$lib/supabase";
-import { browser } from "$app/environment";
+import { getSupabaseClient } from '$lib/app/supabase/supabase';
+import type { LayoutLoad } from './$types';
+
+const supabase = getSupabaseClient();
 
 export const load: LayoutLoad = async () => {
-	const {
-		data: { session },
-	} = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-	return { session };
+  return { session };
 };
-
-// const {
-//   data: { subscription },
-// } = supabase.auth.onAuthStateChange(() => {
-//   invalidate("supabase:auth");
-// });
-
-// return () => {
-//   subscription.unsubscribe();
-// };
