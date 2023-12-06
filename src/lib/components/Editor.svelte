@@ -1,282 +1,277 @@
 <script lang="ts">
-	import { createEventDispatcher } from "svelte";
-	import type { Database } from "$lib/types/supabase";
-	import { getContext } from "svelte";
-	import type { Writable } from "svelte/store";
-	import type { Session } from "@supabase/supabase-js";
-	import { supabase } from "$lib/supabase";
-	import type { Accent, Entry } from "$lib/types";
+  import { createEventDispatcher } from 'svelte';
+  import { getContext } from 'svelte';
+  import type { Writable } from 'svelte/store';
+  import type { Session } from '@supabase/supabase-js';
+  import type { AccentViewDto } from '$lib/domain/entry/model/accent';
+  import { CreateEntryUseCase } from '$lib/domain/entry/use-case/create-entry.use-case';
+  import { UpdateEntryUseCase } from '$lib/domain/entry/use-case/update-entry.use-case';
+  import { CreateAccentUseCase } from '$lib/domain/entry/use-case/create-accent.use-case';
+  import { UpdateAccentUseCase } from '$lib/domain/entry/use-case/update-accent.use-case';
+  import { DeleteAccentUseCase } from '$lib/domain/entry/use-case/delete-accent.use-case';
 
-	const session = getContext<Writable<Session | null>>("session");
+  const session = getContext<Writable<Session | null>>('session');
 
-	const dispatch = createEventDispatcher();
+  const dispatch = createEventDispatcher();
 
-	export let close: () => void;
+  export let close: () => void;
 
-	export let id: number;
-	export let word: string;
-	export let reading: string | null;
-	export let reference: string | null;
-	export let accents: Accent[];
-	export let toast;
-	export let newEntry = false;
+  export let id: number | undefined = undefined;
+  export let word: string;
+  export let reading: string;
+  export let reference: string;
+  export let accents: AccentViewDto[];
+  export let toast;
+  export let newEntry = false;
 
-	const wordOriginal = word;
-	const readingOriginal = reading;
-	const accentOriginal = accents;
-	const referenceOriginal = reference;
+  const wordOriginal = word;
+  const readingOriginal = reading;
+  const accentOriginal = accents;
+  const referenceOriginal = reference;
 
-	let newAccents: Accent[] = [
-		{
-			accent: "",
-			usage: null,
-			author_id: $session ? $session.user.id : null,
-			id: -1,
-			word_id: id,
-			order: null,
-		},
-	];
+  let newAccents: AccentViewDto[] = [
+    {
+      accent: '',
+      usage: '',
+      order: accents.length,
+    },
+  ];
 
-	async function save() {
-		const mergedAccents = accents.concat(newAccents);
-		let finalAccent: Accent[] = [];
+  async function save() {
+    const createEntryUseCase = CreateEntryUseCase.new();
+    const updateEntryUseCase = UpdateEntryUseCase.new();
+    const createAccentUseCase = CreateAccentUseCase.new();
+    const updateAccentUseCase = UpdateAccentUseCase.new();
 
-		mergedAccents.forEach((singleAccent) => {
-			if (singleAccent.accent && singleAccent.accent != "") {
-				finalAccent.push(singleAccent);
-			}
-		});
+    const mergedAccents = accents.concat(newAccents);
+    let finalAccents: AccentViewDto[] = [];
 
-		let entry: Entry = {
-			id: id,
-			word: word,
-			created_at: null,
-			last_updated: null,
-			reading: reading,
-			reference: reference,
-			author_id: $session ? $session?.user.id : null,
-			accents: [],
-		};
+    mergedAccents.forEach((singleAccent) => {
+      if (singleAccent.accent && singleAccent.accent != '') {
+        finalAccents.push(singleAccent);
+      }
+    });
 
-		// UGH.. this is so gross...
-		let entryDoc: Record<string, unknown> = {
-			item: entry.word,
-			accent: finalAccent,
+    try {
+      dispatch('message', {
+        loading: true,
+      });
+      if (newEntry) {
+        const entry = await createEntryUseCase.handle({
+          reading,
+          reference,
+          word,
+          authorId: $session?.user.id,
+        });
 
-			author_id: $session?.user.id,
-		};
+        id = entry.id;
+      } else {
+        if (!id) throw new Error('No ID');
 
-		if (reading) {
-			entryDoc.reading = reading;
-		}
+        const entry = await updateEntryUseCase.handle({
+          id,
+          data: {
+            reading,
+            reference,
+            word,
+          },
+        });
+      }
 
-		if (reference) {
-			entryDoc.reference = reference;
-		}
+      const finalAccentPromises = finalAccents.map(async (finalAccent, index) => {
+        if (!finalAccent.id) {
+          if (!id) throw new Error('No ID');
 
-		try {
-			dispatch("message", {
-				loading: true,
-			});
-			if (newEntry) {
-				const res = await supabase
-					.from("entries")
-					.insert({
-						word: word,
-						reading: reading,
-						reference: reference,
-						author_id: $session?.user.id ? $session.user.id : null,
-					})
-					.select();
-				if (!res.data) throw new Error(res.error.message);
-				id = res.data[0].id;
-				toast.push("「" + entryDoc.item + "」" + "が追加されました。");
-			} else {
-				const res = await supabase
-					.from("entries")
-					.update({
-						word: word,
-						reading: reading,
-						reference: reference,
-					})
-					.eq("id", id);
-				toast.push("「" + entryDoc.item + "」" + "が更新されました。");
-			}
+          await createAccentUseCase.handle({
+            accent: finalAccent.accent,
+            usage: finalAccent.usage,
+            wordId: id,
+            order: index,
+            authorId: $session?.user.id,
+          });
+        } else {
+          await updateAccentUseCase.handle({
+            id: finalAccent.id,
+            data: {
+              accent: finalAccent.accent,
+              usage: finalAccent.usage,
+              order: index,
+            },
+          });
+        }
+      });
 
-			let i = 0;
-			for (const accent of finalAccent) {
-				if (accent.id < 0) {
-					const res = await supabase.from("accents").insert({
-						accent: accent.accent,
-						usage: accent.usage,
-						word_id: id,
-						order: i,
-						author_id: $session?.user.id,
-					});
-				} else {
-					const res = await supabase
-						.from("accents")
-						.update({
-							accent: accent.accent,
-							usage: accent.usage,
-							order: i,
-						})
-						.eq("id", accent.id);
-				}
-				i++;
-			}
-			for (const accent of accents) {
-				if (accent.accent == "") {
-					const res = await supabase.from("accents").delete().eq("id", accent.id);
-				}
-			}
-			dispatch("message", {
-				refresh: true,
-				loading: false,
-			});
-			close();
-		} catch (error) {
-			console.error(error);
-		}
-	}
+      await Promise.all(finalAccentPromises);
 
-	function onChangeHandler(singleAccent: { accent: string; usage: null | string }, i: number) {
-		if (singleAccent.accent == "" && (!singleAccent.usage || singleAccent.usage == "")) {
-			if (newAccents.length > 0) {
-				newAccents.splice(i, 1);
-				newAccents = newAccents;
-			}
-		} else if (singleAccent.accent != "") {
-			if (!newAccents[i + 1] || newAccents.length < 1) {
-				newAccents.push({
-					accent: "",
-					usage: "",
-					author_id: null,
-					id: 0,
-					order: null,
-					word_id: id,
-				});
-				newAccents = newAccents;
-			}
-		}
-	}
+      const deleteAccentsPromises = accents.map(async (accent) => {
+        if (!accent.accent) {
+          if (!accent.id) throw new Error('No ID');
 
-	function onBaseInputHandler(singleAccent: { accent: string; usage: null | string }) {
-		if (singleAccent.accent == "") {
-			if (newAccents.length > 0) {
-				newAccents.pop();
-				newAccents = newAccents;
-			}
-		} else if (singleAccent.accent != "") {
-			if (newAccents.length < 1) {
-				newAccents.push({
-					accent: "",
-					usage: "",
-					author_id: $session ? $session.user.id : null,
-					id: 0,
-					order: null,
-					word_id: 0,
-				});
-				newAccents = newAccents;
-			}
-		}
-	}
+          await DeleteAccentUseCase.new().handle({ id: accent.id });
+        }
+      });
+
+      await Promise.all(deleteAccentsPromises);
+
+      toast.push(`「${word}」が更新されました。`);
+
+      dispatch('message', {
+        refresh: true,
+        loading: false,
+      });
+
+      close();
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  function onChangeHandler(singleAccent: { accent: string; usage: null | string }, i: number) {
+    if (!singleAccent.accent && !singleAccent.usage) {
+      if (newAccents.length > 0) {
+        newAccents.splice(i, 1);
+        newAccents = newAccents;
+      }
+    } else if (!!singleAccent.accent) {
+      if (!newAccents[i + 1] || newAccents.length < 1) {
+        newAccents.push({
+          accent: '',
+          usage: '',
+        });
+
+        newAccents = newAccents;
+      }
+    }
+  }
+
+  function onBaseInputHandler(singleAccent: { accent: string; usage: null | string }) {
+    if (!singleAccent.accent) {
+      if (newAccents.length > 0) {
+        newAccents.pop();
+        newAccents = newAccents;
+      }
+    } else if (!!singleAccent.accent) {
+      if (newAccents.length < 1) {
+        newAccents.push({
+          accent: '',
+          usage: '',
+        });
+
+        newAccents = newAccents;
+      }
+    }
+  }
 </script>
 
-<div class="fixed top-0 left-0 z-10 flex h-screen w-screen justify-center bg-black/40 pt-20">
-	<div class="w-limit-2 z-20 mb-40 h-full w-full px-8 md:py-0 md:px-20">
-		<div
-			class="smooth-shadow flex max-h-[80%] flex-col overflow-auto rounded-lg bg-white px-6 pt-4 pb-8 text-lg md:max-h-[90%]">
-			<h2 class="mb-2 font-bold">編集</h2>
-			<form class="flex flex-col gap-2" on:submit|preventDefault={save}>
-				<div class="flex flex-col gap-2 md:flex-row md:gap-6">
-					<div class="w-full">
-						<label class="text-base" for="item">語句<span class="text-red-500">*</span></label>
-						<input
-							type="text"
-							id="item"
-							class="w-full border bg-slate-50 px-1 "
-							placeholder={wordOriginal}
-							required
-							bind:value={word} />
-					</div>
-					<div class="w-full">
-						<label class="text-base" for="reading">読み</label>
-						<input
-							type="text"
-							id="reading"
-							class="w-full border bg-slate-50 px-1"
-							placeholder={readingOriginal}
-							bind:value={reading} />
-					</div>
-				</div>
-				<div class="mb-4 flex flex-col gap-4">
-					{#each accents as singleAccent, i}
-						<div class="flex flex-col gap-2 md:flex-row md:gap-6">
-							<div class="w-full">
-								<label class="text-base" for="accent"
-									>アクセント{#if i == 0}<span class="text-red-500">*</span>{/if}</label>
-								<input
-									type="text"
-									id="accent"
-									class="w-full border bg-slate-50 px-1"
-									placeholder={accentOriginal[i].accent ? accentOriginal[i].accent : ""}
-									required={i == 0 ? true : false}
-									bind:value={singleAccent.accent}
-									on:input={() => {
-										if (i == 0 && newAccents) onBaseInputHandler(singleAccent);
-									}} />
-							</div>
-							<div class="w-full">
-								<label class="text-base" for="usage">使い方</label>
-								<input
-									type="text"
-									id="usage"
-									class="w-full border bg-slate-50 px-1"
-									placeholder={accentOriginal[i].usage ? accentOriginal[i].usage : ""}
-									bind:value={singleAccent.usage} />
-							</div>
-						</div>
-					{/each}
-					{#each newAccents as singleAccent, i}
-						<div class="flex flex-col gap-2 md:flex-row md:gap-6">
-							<div class="w-full">
-								<label class="text-base" for="accent"
-									>アクセント{#if singleAccent.usage}<span class="text-red-500">*</span>{/if}</label>
-								<input
-									type="text"
-									id="accent"
-									class="w-full border bg-slate-50 px-1"
-									required={singleAccent.usage ? true : false}
-									bind:value={singleAccent.accent}
-									on:input={() => onChangeHandler(singleAccent, i)} />
-							</div>
-							<div class="w-full">
-								<label class="text-base" for="usage">使い方</label>
-								<input
-									type="text"
-									id="usage"
-									class="w-full border bg-slate-50 px-1"
-									bind:value={singleAccent.usage}
-									on:input={() => onChangeHandler(singleAccent, i)} />
-							</div>
-						</div>
-					{/each}
-				</div>
-				<label class="text-base" for="reference">参考</label>
-				<textarea
-					id="reference"
-					name="reference"
-					rows="3"
-					class="w-full border bg-slate-50 px-1"
-					bind:value={reference}
-					placeholder={referenceOriginal} />
-				<div class="mt-8 flex w-full justify-end gap-3 text-sm font-bold">
-					<button type="button" class="w-24 rounded-md border py-2 px-3 text-[#7D69AC]" on:click={close}
-						>キャンセル</button>
-					<button type="submit" class="w-24 rounded-md bg-[#7D69AC] py-2 px-3 text-white">保存</button>
-				</div>
-			</form>
-		</div>
-	</div>
+<div class="fixed left-0 top-0 z-10 flex h-screen w-screen justify-center bg-black/40 pt-20">
+  <div class="w-limit-2 z-20 mb-40 h-full w-full px-8 md:px-20 md:py-0">
+    <div
+      class="smooth-shadow flex max-h-[80%] flex-col overflow-auto rounded-lg bg-white px-6 pb-8 pt-4 text-lg md:max-h-[90%]"
+    >
+      <h2 class="mb-2 font-bold">編集</h2>
+      <form class="flex flex-col gap-2" on:submit|preventDefault={save}>
+        <div class="flex flex-col gap-2 md:flex-row md:gap-6">
+          <div class="w-full">
+            <label class="text-base" for="item">語句<span class="text-red-500">*</span></label>
+            <input
+              type="text"
+              id="item"
+              class="w-full border bg-slate-50 px-1"
+              placeholder={wordOriginal}
+              required
+              bind:value={word}
+            />
+          </div>
+          <div class="w-full">
+            <label class="text-base" for="reading">読み</label>
+            <input
+              type="text"
+              id="reading"
+              class="w-full border bg-slate-50 px-1"
+              placeholder={readingOriginal}
+              bind:value={reading}
+            />
+          </div>
+        </div>
+        <div class="mb-4 flex flex-col gap-4">
+          {#each accents as accent, i}
+            <div class="flex flex-col gap-2 md:flex-row md:gap-6">
+              <div class="w-full">
+                <label class="text-base" for="accent"
+                  >アクセント{#if i == 0}<span class="text-red-500">*</span>{/if}</label
+                >
+                <input
+                  type="text"
+                  id="accent"
+                  class="w-full border bg-slate-50 px-1"
+                  placeholder={accentOriginal[i].accent ? accentOriginal[i].accent : ''}
+                  required={i == 0 ? true : false}
+                  bind:value={accent.accent}
+                  on:input={() => {
+                    if (i === 0 && newAccents) onBaseInputHandler(accent);
+                  }}
+                />
+              </div>
+              <div class="w-full">
+                <label class="text-base" for="usage">使い方</label>
+                <input
+                  type="text"
+                  id="usage"
+                  class="w-full border bg-slate-50 px-1"
+                  placeholder={accentOriginal[i].usage ? accentOriginal[i].usage : ''}
+                  bind:value={accent.usage}
+                />
+              </div>
+            </div>
+          {/each}
+          {#each newAccents as newAccent, i}
+            <div class="flex flex-col gap-2 md:flex-row md:gap-6">
+              <div class="w-full">
+                <label class="text-base" for="accent"
+                  >アクセント{#if newAccent.usage}<span class="text-red-500">*</span>{/if}</label
+                >
+                <input
+                  type="text"
+                  id="accent"
+                  class="w-full border bg-slate-50 px-1"
+                  required={newAccent.usage ? true : false}
+                  bind:value={newAccent.accent}
+                  on:input={() => onChangeHandler(newAccent, i)}
+                />
+              </div>
+              <div class="w-full">
+                <label class="text-base" for="usage">使い方</label>
+                <input
+                  type="text"
+                  id="usage"
+                  class="w-full border bg-slate-50 px-1"
+                  bind:value={newAccent.usage}
+                  on:input={() => onChangeHandler(newAccent, i)}
+                />
+              </div>
+            </div>
+          {/each}
+        </div>
+        <label class="text-base" for="reference">参考</label>
+        <textarea
+          id="reference"
+          name="reference"
+          rows="3"
+          class="w-full border bg-slate-50 px-1"
+          bind:value={reference}
+          placeholder={referenceOriginal}
+        />
+        <div class="mt-8 flex w-full justify-end gap-3 text-sm font-bold">
+          <button
+            type="button"
+            class="w-24 rounded-md border px-3 py-2 text-[#7D69AC]"
+            on:click={close}>キャンセル</button
+          >
+          <button type="submit" class="w-24 rounded-md bg-[#7D69AC] px-3 py-2 text-white"
+            >保存</button
+          >
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
