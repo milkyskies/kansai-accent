@@ -38,7 +38,7 @@ export class FindEntryUseCase {
       throw new Error(`Entry not found: ${args.entryId}`);
     }
 
-    const accents = await this.accentRepository.findByWordId({ wordId: entry.id });
+    const accents = await this.accentRepository.findByEntryId({ entryId: entry.id });
 
     const entryWithAccents = entry.setAccents({ accents });
 

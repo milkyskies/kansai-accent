@@ -3,14 +3,16 @@ import { Accent } from '../model/accent';
 import type { InsertDto, UpdateDto } from '$lib/app/supabase/supabase-dto.helper';
 
 export interface IAccentRepository {
-  findByWordId: (args: { wordId: number }) => Promise<Accent[]>;
-  create: (args: {
+  findByEntryId: (args: { entryId: number }) => Promise<Accent[]>;
+  upsert: (args: {
+    id?: number;
     accent: string;
-    usage?: string;
+    usage: string;
     authorId?: string;
-    wordId: number;
-    order?: number;
+    entryId: number;
+    order: number;
   }) => Promise<Accent>;
+  upsertMany: (args: { accents: InsertDto<'accents'>[] }) => Promise<Accent[]>;
   updateById: (args: {
     id: number;
     data: {
@@ -29,8 +31,11 @@ export class AccentRepository implements IAccentRepository {
     this.supabase = args.supabase;
   }
 
-  async findByWordId(args: { wordId: number }): Promise<Accent[]> {
-    const { data, error } = await this.supabase.from('accents').select().eq('word_id', args.wordId);
+  async findByEntryId(args: { entryId: number }): Promise<Accent[]> {
+    const { data, error } = await this.supabase
+      .from('accents')
+      .select()
+      .eq('entry_id', args.entryId);
 
     if (error) {
       throw error;
@@ -45,20 +50,23 @@ export class AccentRepository implements IAccentRepository {
     return accents;
   }
 
-  async create(args: {
+  async upsert(args: {
+    id?: number;
     accent: string;
-    usage?: string;
+    usage: string;
     authorId?: string;
-    wordId: number;
-    order?: number;
+    entryId: number;
+    order: number;
   }): Promise<Accent> {
     const { data, error } = await this.supabase
       .from('accents')
-      .insert<InsertDto<'accents'>>({
+      .upsert<InsertDto<'accents'>>({
+        id: args.id,
         accent: args.accent,
         usage: args.usage,
         author_id: args.authorId,
-        word_id: args.wordId,
+        entry_id: args.entryId,
+        order: args.order,
       })
       .select()
       .single();
@@ -74,6 +82,29 @@ export class AccentRepository implements IAccentRepository {
     const accent = Accent.fromSupabase({ supabaseAccent: data });
 
     return accent;
+  }
+
+  async upsertMany(args: { accents: InsertDto<'accents'>[] }): Promise<Accent[]> {
+    const { data, error } = await this.supabase
+      .from('accents')
+      .upsert<InsertDto<'accents'>>(args.accents, { defaultToNull: false })
+      .select();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      throw new Error('Failed to upsert accents');
+    }
+
+    const accents = data.map((supabaseAccent) => {
+      const accent = Accent.fromSupabase({ supabaseAccent });
+
+      return accent;
+    });
+
+    return accents;
   }
 
   async updateById(args: {

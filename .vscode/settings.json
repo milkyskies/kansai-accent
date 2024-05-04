@@ -4,5 +4,8 @@
   "[svelte]": {
     "editor.defaultFormatter": "svelte.svelte-vscode"
   },
-  "cSpell.words": ["Postgrest"]
+  "cSpell.words": [
+    "Dtos",
+    "Postgrest"
+  ]
 }
