@@ -6,25 +6,25 @@ export type AccentValues = {
   accent: string;
   authorId?: string;
   id: number;
-  order?: number;
-  usage?: string;
-  wordId: number;
+  order: number;
+  usage: string;
+  entryId: number;
 };
 
 export type AccentViewDto = {
   id?: number;
   accent: string;
   usage: string;
-  order?: number;
+  order: number;
 };
 
 export class Accent {
   private readonly _accent: string;
   private readonly _authorId?: string;
   private readonly _id: number;
-  private readonly _order?: number;
-  private readonly _usage?: string;
-  private readonly _wordId: number;
+  private readonly _order: number;
+  private readonly _usage: string;
+  private readonly _entryId: number;
 
   private constructor(args: AccentValues) {
     this._accent = args.accent;
@@ -32,7 +32,7 @@ export class Accent {
     this._id = args.id;
     this._order = args.order;
     this._usage = args.usage;
-    this._wordId = args.wordId;
+    this._entryId = args.entryId;
   }
 
   public static fromValues(args: AccentValues): Accent {
@@ -42,7 +42,7 @@ export class Accent {
       id: args.id,
       order: args.order,
       usage: args.usage,
-      wordId: args.wordId,
+      entryId: args.entryId,
     });
 
     return accent;
@@ -55,7 +55,7 @@ export class Accent {
       id: args.supabaseAccent.id,
       order: args.supabaseAccent.order ?? undefined,
       usage: args.supabaseAccent.usage ?? undefined,
-      wordId: args.supabaseAccent.word_id,
+      entryId: args.supabaseAccent.entry_id,
     });
 
     return accent;
@@ -80,7 +80,19 @@ export class Accent {
     return this._accent;
   }
 
-  get usage(): string | undefined {
+  get usage(): string {
     return this._usage;
+  }
+
+  get authorId(): string | undefined {
+    return this._authorId;
+  }
+
+  get entryId(): number {
+    return this._entryId;
+  }
+
+  get order(): number {
+    return this._order;
   }
 }

@@ -64,7 +64,7 @@ export class SearchEntriesUseCase {
 
     const entriesWithAccents = await Promise.all(
       entries.map(async (entry) => {
-        const accents = await this.accentRepository.findByWordId({ wordId: entry.id });
+        const accents = await this.accentRepository.findByEntryId({ entryId: entry.id });
 
         const entryWithAccents = entry.setAccents({ accents });
 

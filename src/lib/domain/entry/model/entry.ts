@@ -8,7 +8,7 @@ export type EntryValues = {
   authorId?: string;
   createdAt?: string;
   id: number;
-  lastUpdated?: string;
+  updatedAt?: string;
   reading?: string;
   reference?: string;
   accents: Accent[];
@@ -29,7 +29,7 @@ export class Entry {
     this._authorId = args.authorId;
     this._createdAt = args.createdAt;
     this._id = args.id;
-    this._lastUpdated = args.lastUpdated;
+    this._lastUpdated = args.updatedAt;
     this._reading = args.reading;
     this._reference = args.reference;
     this._accents = args.accents;
@@ -41,7 +41,7 @@ export class Entry {
       authorId: args.authorId,
       createdAt: args.createdAt,
       id: args.id,
-      lastUpdated: args.lastUpdated,
+      updatedAt: args.updatedAt,
       reading: args.reading,
       reference: args.reference,
       accents: args.accents,
@@ -56,7 +56,7 @@ export class Entry {
       authorId: args.supabaseEntry.author_id ?? '',
       createdAt: args.supabaseEntry.created_at ?? '',
       id: args.supabaseEntry.id,
-      lastUpdated: args.supabaseEntry.last_updated ?? '',
+      updatedAt: args.supabaseEntry.updated_at ?? '',
       reading: args.supabaseEntry.reading ?? '',
       reference: args.supabaseEntry.reference ?? '',
       accents: [],
@@ -71,7 +71,7 @@ export class Entry {
       authorId: this._authorId,
       createdAt: this._createdAt,
       id: this._id,
-      lastUpdated: this._lastUpdated,
+      updatedAt: this._lastUpdated,
       reading: this._reading,
       reference: this._reference,
       accents: args.accents,

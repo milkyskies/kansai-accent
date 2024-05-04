@@ -6,7 +6,7 @@
   import type { AccentViewDto } from '$lib/domain/entry/model/accent';
   import { CreateEntryUseCase } from '$lib/domain/entry/use-case/create-entry.use-case';
   import { UpdateEntryUseCase } from '$lib/domain/entry/use-case/update-entry.use-case';
-  import { CreateAccentUseCase } from '$lib/domain/entry/use-case/create-accent.use-case';
+  import { UpsertAccentUseCase } from '$lib/domain/entry/use-case/upsert-accent.use-case';
   import { UpdateAccentUseCase } from '$lib/domain/entry/use-case/update-accent.use-case';
   import { DeleteAccentUseCase } from '$lib/domain/entry/use-case/delete-accent.use-case';
 
@@ -40,7 +40,7 @@
   async function save() {
     const createEntryUseCase = CreateEntryUseCase.new();
     const updateEntryUseCase = UpdateEntryUseCase.new();
-    const createAccentUseCase = CreateAccentUseCase.new();
+    const upsertAccentUseCase = UpsertAccentUseCase.new();
     const updateAccentUseCase = UpdateAccentUseCase.new();
 
     const mergedAccents = accents.concat(newAccents);
@@ -78,40 +78,22 @@
         });
       }
 
-      const finalAccentPromises = finalAccents.map(async (finalAccent, index) => {
-        if (!finalAccent.id) {
-          if (!id) throw new Error('No ID');
+      const insertDtos = finalAccents.map((finalAccent) => {
+        if (!id) throw new Error('No entry ID');
 
-          await createAccentUseCase.handle({
-            accent: finalAccent.accent,
-            usage: finalAccent.usage,
-            wordId: id,
-            order: index,
-            authorId: $session?.user.id,
-          });
-        } else {
-          await updateAccentUseCase.handle({
-            id: finalAccent.id,
-            data: {
-              accent: finalAccent.accent,
-              usage: finalAccent.usage,
-              order: index,
-            },
-          });
-        }
+        return {
+          id: finalAccent.id,
+          accent: finalAccent.accent,
+          usage: finalAccent.usage,
+          entryId: id,
+          order: finalAccent.order,
+          authorId: $session?.user.id,
+        };
       });
 
-      await Promise.all(finalAccentPromises);
-
-      const deleteAccentsPromises = accents.map(async (accent) => {
-        if (!accent.accent) {
-          if (!accent.id) throw new Error('No ID');
-
-          await DeleteAccentUseCase.new().handle({ id: accent.id });
-        }
+      await upsertAccentUseCase.handleMany({
+        accents: insertDtos,
       });
-
-      await Promise.all(deleteAccentsPromises);
 
       toast.push(`「${word}」が更新されました。`);
 
@@ -124,12 +106,29 @@
     } catch (error) {
       console.error(error);
     }
+
+    const deleteAccentsPromises = accents.map(async (accent) => {
+      if (!accent.accent) {
+        if (!accent.id) throw new Error('No ID');
+
+        await DeleteAccentUseCase.new().handle({ id: accent.id });
+      }
+    });
+
+    await Promise.all(deleteAccentsPromises);
   }
 
   function onChangeHandler(singleAccent: { accent: string; usage: null | string }, i: number) {
     if (!singleAccent.accent && !singleAccent.usage) {
       if (newAccents.length > 0) {
         newAccents.splice(i, 1);
+
+        newAccents.forEach((newAccent) => {
+          if (newAccent.order > i) {
+            newAccent.order -= 1;
+          }
+        });
+
         newAccents = newAccents;
       }
     } else if (!!singleAccent.accent) {
@@ -137,6 +136,7 @@
         newAccents.push({
           accent: '',
           usage: '',
+          order: newAccents.length + accents.length,
         });
 
         newAccents = newAccents;
@@ -155,6 +155,7 @@
         newAccents.push({
           accent: '',
           usage: '',
+          order: accents.length,
         });
 
         newAccents = newAccents;
@@ -200,6 +201,7 @@
                 <label class="text-base" for="accent"
                   >アクセント{#if i == 0}<span class="text-red-500">*</span>{/if}</label
                 >
+                {accent.order}
                 <input
                   type="text"
                   id="accent"
@@ -227,6 +229,7 @@
           {#each newAccents as newAccent, i}
             <div class="flex flex-col gap-2 md:flex-row md:gap-6">
               <div class="w-full">
+                {newAccent.order}
                 <label class="text-base" for="accent"
                   >アクセント{#if newAccent.usage}<span class="text-red-500">*</span>{/if}</label
                 >
