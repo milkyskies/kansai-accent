@@ -201,7 +201,6 @@
                 <label class="text-base" for="accent"
                   >アクセント{#if i == 0}<span class="text-red-500">*</span>{/if}</label
                 >
-                {accent.order}
                 <input
                   type="text"
                   id="accent"
@@ -229,7 +228,6 @@
           {#each newAccents as newAccent, i}
             <div class="flex flex-col gap-2 md:flex-row md:gap-6">
               <div class="w-full">
-                {newAccent.order}
                 <label class="text-base" for="accent"
                   >アクセント{#if newAccent.usage}<span class="text-red-500">*</span>{/if}</label
                 >
